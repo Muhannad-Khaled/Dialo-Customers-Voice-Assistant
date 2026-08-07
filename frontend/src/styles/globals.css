@@ -1,0 +1,123 @@
+/* ─── Reset ─────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ─── Design Tokens ─────────────────────────────────────────── */
+:root {
+  --bg:          #0a0e1a;
+  --bg-card:     #111827;
+  --bg-elevated: #1c2537;
+  --border:      rgba(99, 179, 237, 0.12);
+  --accent:      #6366f1;
+  --accent-glow: rgba(99, 102, 241, 0.35);
+  --primary:     #63b3ed;
+  --success:     #48bb78;
+  --danger:      #fc8181;
+  --text:        #e2e8f0;
+  --text-muted:  #718096;
+  --radius:      14px;
+  --font:        'Inter', system-ui, sans-serif;
+}
+
+/* ─── Base ───────────────────────────────────────────────────── */
+html, body { height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ─── Layout ─────────────────────────────────────────────────── */
+.container { max-width: 900px; margin: 0 auto; padding: 0 1.5rem; }
+
+/* ─── Gradient Text ─────────────────────────────────────────── */
+.gradient-text {
+  background: linear-gradient(135deg, #6366f1 0%, #63b3ed 50%, #9f7aea 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ─── Card ───────────────────────────────────────────────────── */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 2rem;
+}
+
+/* ─── Button ─────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .75rem 1.75rem;
+  border-radius: 10px;
+  font-family: var(--font);
+  font-weight: 600;
+  font-size: .95rem;
+  cursor: pointer;
+  border: none;
+  transition: transform .15s, box-shadow .15s, background .2s;
+}
+.btn:hover { transform: translateY(-1px); }
+.btn:active { transform: translateY(0); }
+
+.btn-primary {
+  background: linear-gradient(135deg, #6366f1, #9f7aea);
+  color: #fff;
+  box-shadow: 0 4px 20px var(--accent-glow);
+}
+.btn-primary:hover { box-shadow: 0 6px 28px var(--accent-glow); }
+
+.btn-danger {
+  background: transparent;
+  color: var(--danger);
+  border: 1.5px solid var(--danger);
+}
+.btn-danger:hover { background: rgba(252,129,129,.1); }
+
+.btn-ghost {
+  background: rgba(255,255,255,.04);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+
+/* ─── Input ──────────────────────────────────────────────────── */
+.input {
+  width: 100%;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: .65rem 1rem;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: .9rem;
+  outline: none;
+  transition: border-color .2s;
+}
+.input:focus { border-color: var(--accent); }
+
+/* ─── Pulse animation ────────────────────────────────────────── */
+@keyframes pulse-ring {
+  0%   { transform: scale(.95); box-shadow: 0 0 0 0 var(--accent-glow); }
+  70%  { transform: scale(1);   box-shadow: 0 0 0 14px transparent; }
+  100% { transform: scale(.95); box-shadow: 0 0 0 0 transparent; }
+}
+.pulse { animation: pulse-ring 2s infinite; }
+
+/* ─── Fade in ────────────────────────────────────────────────── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-in { animation: fadeIn .4s ease both; }
+
+/* ─── Status dot ─────────────────────────────────────────────── */
+.status-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  display: inline-block; margin-right: 6px;
+}
+.status-dot.live    { background: var(--success); }
+.status-dot.offline { background: var(--text-muted); }

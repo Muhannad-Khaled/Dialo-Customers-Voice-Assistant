@@ -1,0 +1,152 @@
+version: "3.9"
+
+services:
+  # ── FastAPI Backend ───────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: dialo_backend
+    env_file: .env
+    environment:
+      # No bytecode churn on the Windows<->WSL2 bind mount.
+      PYTHONDONTWRITEBYTECODE: "1"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - ./data:/app/data
+      - tts_models:/app/tts_models
+    depends_on:
+      postgres:
+        condition: service_healthy
+      chromadb:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    # Download the Piper voice (idempotent), apply DB migrations, then serve.
+    # NOTE: --reload removed — watchfiles force-polling burned ~30% CPU idle on this
+    # 8GB host, starving the real-time agent. Restart the container after backend
+    # code edits (docker compose restart backend), or re-add --reload if you have
+    # CPU headroom.
+    command: >
+      sh -c "python scripts/download_piper_model.py &&
+             alembic upgrade head &&
+             uvicorn main:app --host 0.0.0.0 --port 8000"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/api/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── Next.js Frontend ──────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_BACKEND_URL: ${NEXT_PUBLIC_BACKEND_URL:-http://localhost:8000}
+        NEXT_PUBLIC_LIVEKIT_URL: ${NEXT_PUBLIC_LIVEKIT_URL}
+        NEXT_PUBLIC_VOICE_MODE: ${NEXT_PUBLIC_VOICE_MODE:-agent}
+    container_name: dialo_frontend
+    env_file: .env
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  # ── PostgreSQL (durable transcript store) ─────────────────
+  # Backs /api/history and /api/feedback. The backend runs `alembic upgrade head`
+  # on boot; the agent writes each turn via persist_turn (best-effort).
+  postgres:
+    image: postgres:16-alpine
+    container_name: dialo_postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-dialo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dialo_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-dialo_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dialo} -d ${POSTGRES_DB:-dialo_db}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: dialo_redis
+    # --appendonly yes persists conversation history across container recreates
+    # (short-term memory still expires via the 1h TTL set in agent/graph.py).
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ── ChromaDB Vector Store ─────────────────────────────────
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: dialo_chromadb
+    ports:
+      - "8001:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    restart: unless-stopped
+
+  # ── LiveKit Server (local dev only — disabled: using LiveKit Cloud) ──
+  # Uncomment for a fully local stack, and set LIVEKIT_URL=ws://livekit:7880
+  # (agent) / ws://localhost:7880 (browser) with LIVEKIT_API_KEY=devkey,
+  # LIVEKIT_API_SECRET=secret in .env.
+  # livekit:
+  #   image: livekit/livekit-server:latest
+  #   container_name: dialo_livekit
+  #   ports:
+  #     - "7880:7880"
+  #     - "7881:7881"
+  #     - "7882:7882/udp"
+  #   command: --dev --bind 0.0.0.0
+  #   restart: unless-stopped
+
+  # ── LiveKit Agent Worker (core real-time voice pipeline) ──
+  agent:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: dialo_agent
+    env_file: .env
+    # LIVEKIT_URL / API_KEY / API_SECRET come from .env (LiveKit Cloud).
+    volumes:
+      - ./backend:/app
+      - ./data:/app/data
+      - tts_models:/app/tts_models
+    depends_on:
+      postgres:
+        condition: service_healthy
+      chromadb:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    # Fetch Piper voice + Silero VAD weights, then run the worker.
+    command: >
+      sh -c "python scripts/download_piper_model.py &&
+             python agent_worker.py download-files &&
+             python agent_worker.py start"
+    restart: unless-stopped
+
+volumes:
+  chroma_data:
+  redis_data:
+  tts_models:
+  postgres_data:

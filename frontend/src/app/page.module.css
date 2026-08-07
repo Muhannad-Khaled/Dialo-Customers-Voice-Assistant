@@ -1,0 +1,141 @@
+.main {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1.5rem;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Background orbs */
+.orb1,
+.orb2 {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(120px);
+    pointer-events: none;
+    z-index: 0;
+}
+
+.orb1 {
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba(99, 102, 241, .18) 0%, transparent 70%);
+    top: -200px;
+    left: -200px;
+}
+
+.orb2 {
+    width: 500px;
+    height: 500px;
+    background: radial-gradient(circle, rgba(99, 179, 237, .12) 0%, transparent 70%);
+    bottom: -200px;
+    right: -200px;
+}
+
+.hero {
+    position: relative;
+    z-index: 1;
+    max-width: 700px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2rem;
+    text-align: center;
+}
+
+.badge {
+    display: inline-flex;
+    align-items: center;
+    padding: .35rem 1rem;
+    border-radius: 100px;
+    border: 1px solid rgba(99, 102, 241, .3);
+    background: rgba(99, 102, 241, .08);
+    font-size: .8rem;
+    font-weight: 500;
+    color: #a5b4fc;
+    gap: .2rem;
+}
+
+.headline {
+    font-size: clamp(2.2rem, 6vw, 3.5rem);
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: -.02em;
+}
+
+.sub {
+    color: var(--text-muted);
+    font-size: 1.05rem;
+    max-width: 520px;
+}
+
+/* Join card */
+.joinCard {
+    width: 100%;
+    max-width: 440px;
+    text-align: left;
+}
+
+.field {
+    margin-bottom: 1.1rem;
+}
+
+.label {
+    display: block;
+    font-size: .82rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    margin-bottom: .45rem;
+    letter-spacing: .03em;
+    text-transform: uppercase;
+}
+
+.error {
+    color: var(--danger);
+    font-size: .85rem;
+    margin-bottom: .75rem;
+}
+
+.joinBtn {
+    width: 100%;
+    justify-content: center;
+    margin-top: .5rem;
+}
+
+.loading {
+    opacity: .7;
+    cursor: not-allowed;
+}
+
+/* Feature grid */
+.features {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+    width: 100%;
+}
+
+.featureCard {
+    text-align: center;
+    padding: 1.5rem 1rem;
+}
+
+.featureIcon {
+    font-size: 1.75rem;
+    display: block;
+    margin-bottom: .75rem;
+}
+
+.featureTitle {
+    font-size: .9rem;
+    font-weight: 600;
+    margin-bottom: .4rem;
+}
+
+.featureDesc {
+    font-size: .8rem;
+    color: var(--text-muted);
+}

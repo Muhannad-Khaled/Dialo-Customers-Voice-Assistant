@@ -1,0 +1,8 @@
+.canvas {
+    border-radius: 50%;
+    transition: transform .3s;
+}
+
+.active {
+    transform: scale(1.05);
+}

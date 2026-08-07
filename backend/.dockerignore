@@ -1,0 +1,26 @@
+# Local dev virtualenv (huge, must never go into the image)
+.venv/
+venv/
+env/
+
+# Python caches
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Secrets / local env (env vars are injected by docker-compose)
+.env
+.env.*
+
+# Models are downloaded at runtime into a volume
+tts_models/
+*.onnx
+*.onnx.json
+
+# Misc
+*.log
+.git/

@@ -1,0 +1,13 @@
+# Installed in-image via `npm ci` — never copy the host copy
+node_modules/
+.next/
+out/
+
+# Secrets / local env
+.env
+.env.*
+
+# Misc
+npm-debug.log*
+*.log
+.git/

@@ -1,0 +1,63 @@
+# FastAPI core dependencies
+fastapi
+uvicorn[standard]
+python-multipart
+python-dotenv
+pydantic
+pydantic-settings
+
+
+
+# LiveKit — token issuance + real-time Agents worker
+livekit-api
+livekit-agents==1.6.7
+livekit-plugins-silero==1.6.7   # Silero VAD (onnxruntime — no PyTorch)
+livekit-plugins-groq==1.6.7     # Groq Whisper STT (free API)
+
+# LangGraph + LangChain
+# NOTE: the `langchain` umbrella package is intentionally NOT listed — it's unused
+# (we import only langchain_core, langchain_google_genai, langgraph) and it forced
+# pip into massive dependency-resolution backtracking. Pinning the Google packages
+# (shared google-genai dep) keeps resolution fast and deterministic.
+langgraph==1.2.10
+langchain-google-genai==4.3.2
+# google-genai is pulled by langchain-google-genai (>=1.65) and llama-index's
+# google embeddings; left unpinned so pip picks the one version both accept.
+
+# LlamaIndex + RAG
+llama-index
+llama-index-vector-stores-chroma
+# Embeddings via the free Gemini API (no local model / PyTorch needed)
+llama-index-embeddings-google-genai
+
+# ChromaDB client
+chromadb
+
+# STT: Groq-hosted Whisper (see livekit-plugins-groq above; REST fallback uses httpx)
+
+# TTS: Piper
+piper-tts==1.2.0
+
+# Database (Postgres) + migrations
+sqlalchemy[asyncio]==2.0.31
+asyncpg==0.29.0
+alembic==1.13.2
+
+# Cache / shared session memory
+redis==5.0.7
+
+# Auth (password hashing + JWT)
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1   # pin <4.1: passlib 1.7.4 reads bcrypt.__about__ (removed in 4.1+)
+python-jose[cryptography]==3.3.0
+
+# Logging
+structlog==24.2.0
+
+# HTTP client (>=0.28.1 required by google-genai 2.x)
+httpx==0.28.1
+
+# Testing / Load testing
+locust==2.29.1
+pytest==8.2.2
+pytest-asyncio==0.23.7

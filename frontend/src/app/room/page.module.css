@@ -1,0 +1,15 @@
+.loading,
+.error {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    color: var(--text-muted);
+    font-size: 1.1rem;
+}
+
+.error a {
+    color: var(--primary);
+    text-decoration: underline;
+}
