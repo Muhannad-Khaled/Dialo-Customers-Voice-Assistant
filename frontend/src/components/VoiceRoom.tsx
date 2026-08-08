@@ -12,11 +12,13 @@ import '@livekit/components-styles'
 import styles from './VoiceRoom.module.css'
 import AudioVisualizer from './AudioVisualizer'
 import TranscriptPanel from './TranscriptPanel'
+import { STRINGS, isRTL, type Lang } from '@/lib/strings'
 
 interface VoiceRoomProps {
     token: string
     room: string
     identity: string
+    language: Lang
 }
 
 interface Message {
@@ -28,7 +30,7 @@ interface Message {
 // agent = real-time LiveKit agent worker (default) | rest = record->STT->chat->TTS fallback
 const VOICE_MODE = process.env.NEXT_PUBLIC_VOICE_MODE || 'agent'
 
-export default function VoiceRoom({ token, room, identity }: VoiceRoomProps) {
+export default function VoiceRoom({ token, room, identity, language }: VoiceRoomProps) {
     const lkUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL || 'ws://localhost:7880'
 
     return (
@@ -40,23 +42,25 @@ export default function VoiceRoom({ token, room, identity }: VoiceRoomProps) {
             video={false}
             onDisconnected={() => (window.location.href = '/')}
             data-lk-theme="default"
+            dir={isRTL(language) ? 'rtl' : 'ltr'}
         >
             {/* Plays the agent's synthesized (TTS) audio track. */}
             <RoomAudioRenderer />
             {VOICE_MODE === 'rest'
-                ? <RestRoomUI room={room} identity={identity} />
-                : <AgentRoomUI room={room} identity={identity} />}
+                ? <RestRoomUI room={room} identity={identity} language={language} />
+                : <AgentRoomUI room={room} identity={identity} language={language} />}
         </LiveKitRoom>
     )
 }
 
 /* ─── Agent mode: continuous LiveKit voice agent ──────────────────────────── */
 
-function AgentRoomUI({ room, identity }: { room: string; identity: string }) {
+function AgentRoomUI({ room, identity, language }: { room: string; identity: string; language: Lang }) {
     const { localParticipant } = useLocalParticipant()
     const { state: agentState } = useVoiceAssistant()
     const transcriptions = useTranscriptions()
     const [muted, setMuted] = useState(false)
+    const t = STRINGS[language]
 
     const localIdentity = localParticipant?.identity
 
@@ -78,21 +82,21 @@ function AgentRoomUI({ room, identity }: { room: string; identity: string }) {
     }, [muted, localParticipant])
 
     const statusLabel = muted
-        ? 'Muted'
+        ? t.muted
         : agentState === 'thinking'
-            ? 'Thinking…'
+            ? t.thinking
             : agentState === 'speaking'
-                ? 'Speaking…'
+                ? t.speaking
                 : agentState === 'listening'
-                    ? 'Listening…'
-                    : 'Connecting…'
+                    ? t.listening
+                    : t.connectingShort
     const live = !muted && (agentState === 'listening' || agentState === 'speaking')
 
     return (
         <div className={styles.roomWrapper}>
             <div className={styles.sidebar}>
                 <div className={styles.sidebarHeader}>
-                    <span className="gradient-text" style={{ fontWeight: 700, fontSize: '1.1rem' }}>Dialo</span>
+                    <span className="gradient-text" style={{ fontWeight: 700, fontSize: '1.1rem' }}>{t.brand}</span>
                     <span className={styles.roomBadge}>{room}</span>
                 </div>
 
@@ -106,24 +110,24 @@ function AgentRoomUI({ room, identity }: { room: string; identity: string }) {
 
                 <div className={styles.controls}>
                     <p className={styles.statusText} style={{ textAlign: 'center', opacity: 0.7 }}>
-                        Just start speaking — the assistant is listening.
+                        {t.startSpeaking}
                     </p>
                     <button onClick={toggleMute} className="btn btn-ghost" id="mute-btn">
-                        {muted ? '🔇 Unmute' : '🔊 Mute'}
+                        {muted ? t.unmute : t.mute}
                     </button>
                     <button className="btn btn-ghost" id="leave-btn" onClick={() => (window.location.href = '/')}>
-                        ✕ Leave
+                        {t.leave}
                     </button>
                 </div>
 
                 <div className={styles.sessionInfo}>
-                    <p className={styles.infoRow}><span>Identity</span><span>{identity}</span></p>
-                    <p className={styles.infoRow}><span>Mode</span><span>agent</span></p>
+                    <p className={styles.infoRow}><span>{t.identity}</span><span>{identity}</span></p>
+                    <p className={styles.infoRow}><span>{t.mode}</span><span>agent</span></p>
                 </div>
             </div>
 
             <div className={styles.main}>
-                <TranscriptPanel messages={messages} identity={identity} />
+                <TranscriptPanel messages={messages} identity={identity} language={language} />
             </div>
         </div>
     )
@@ -131,7 +135,7 @@ function AgentRoomUI({ room, identity }: { room: string; identity: string }) {
 
 /* ─── Dev fallback: manual record → REST STT/Chat/TTS loop ─────────────────── */
 
-function RestRoomUI({ room, identity }: { room: string; identity: string }) {
+function RestRoomUI({ room, identity, language }: { room: string; identity: string; language: Lang }) {
     const { localParticipant } = useLocalParticipant()
     const [muted, setMuted] = useState(false)
     const [messages, setMessages] = useState<Message[]>([])
@@ -253,7 +257,7 @@ function RestRoomUI({ room, identity }: { room: string; identity: string }) {
             </div>
 
             <div className={styles.main}>
-                <TranscriptPanel messages={messages} identity={identity} />
+                <TranscriptPanel messages={messages} identity={identity} language={language} />
             </div>
         </div>
     )

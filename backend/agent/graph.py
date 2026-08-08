@@ -11,7 +11,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.messages import messages_from_dict, messages_to_dict
 from rag.retriever import retrieve
-from agent.prompts import RAG_SYSTEM_PROMPT
+from agent.prompts import build_system_prompt
 from core.config import settings
 from db.crud import get_messages, persist_turn
 from db.session import AsyncSessionLocal
@@ -41,6 +41,7 @@ def _extract_text(content) -> str:
 class AgentState(TypedDict):
     query: str
     session_id: str
+    language: str  # "en" | "ar" — drives the reply-language directive in the prompt
     history: Annotated[list, operator.add]  # accumulated messages
     context: str
     sources: list[str]
@@ -70,7 +71,7 @@ async def node_generate(state: AgentState) -> dict:
         google_api_key=settings.gemini_api_key,
         temperature=0.3,
     )
-    system = RAG_SYSTEM_PROMPT.format(context=state["context"])
+    system = build_system_prompt(state["context"], state.get("language", "en"))
     messages = [SystemMessage(content=system)] + state["history"] + [HumanMessage(content=state["query"])]
     response = await llm.ainvoke(messages)
     answer = _extract_text(response.content)
@@ -179,11 +180,26 @@ async def _save_history(session_id: str, messages: list) -> None:
     _fallback_histories[session_id] = trimmed
 
 
-async def run_agent(query: str, session_id: str) -> dict:
+# Spoken fallbacks when a turn fails — kept in the reply language so an Arabic call
+# never suddenly answers in English.
+_QUOTA_FALLBACK = {
+    "en": ("I'm getting a lot of requests right now and hit my rate limit. "
+           "Please try again in a minute."),
+    "ar": "فيه ضغط كبير دلوقتي ووصلت للحد المسموح. جرّب تاني بعد دقيقة لو سمحت.",
+}
+_ERROR_FALLBACK = {
+    "en": "Sorry, I ran into a problem answering that. Could you try again?",
+    "ar": "معلش، حصلت مشكلة وأنا برد. ممكن تجرّب تاني؟",
+}
+
+
+async def run_agent(query: str, session_id: str, language: str = "en") -> dict:
+    lang = language if language in ("en", "ar") else "en"
     history = await _load_history(session_id)
     initial_state: AgentState = {
         "query": query,
         "session_id": session_id,
+        "language": lang,
         "history": history,
         "context": "",
         "sources": [],
@@ -195,12 +211,10 @@ async def run_agent(query: str, session_id: str) -> dict:
         msg = str(e)
         if "RESOURCE_EXHAUSTED" in msg or "429" in msg:
             logger.warning("llm_quota_exceeded", session=session_id)
-            answer = ("I'm getting a lot of requests right now and hit my rate limit. "
-                      "Please try again in a minute.")
+            answer = _QUOTA_FALLBACK[lang]
         else:
             logger.error("run_agent_failed", session=session_id, error=msg)
-            answer = ("Sorry, I ran into a problem answering that. "
-                      "Could you try again?")
+            answer = _ERROR_FALLBACK[lang]
         # Speak a graceful message instead of failing the turn silently. We skip
         # history/persistence here since no real assistant turn was produced.
         return {"answer": answer, "sources": []}

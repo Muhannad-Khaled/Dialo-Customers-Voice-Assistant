@@ -13,6 +13,7 @@ function RoomContent() {
     const token = params.get('token') ?? ''
     const room = params.get('room') ?? ''
     const identity = params.get('identity') ?? ''
+    const language = params.get('language') === 'ar' ? 'ar' : 'en'
 
     if (!token) {
         return (
@@ -23,7 +24,7 @@ function RoomContent() {
         )
     }
 
-    return <VoiceRoom token={token} room={room} identity={identity} />
+    return <VoiceRoom token={token} room={room} identity={identity} language={language} />
 }
 
 export default function RoomPage() {

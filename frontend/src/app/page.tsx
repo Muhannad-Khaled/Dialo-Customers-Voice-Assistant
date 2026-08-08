@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import styles from './page.module.css'
+import { STRINGS, LANGUAGES, isRTL, type Lang } from '@/lib/strings'
 
 export default function HomePage() {
     const router = useRouter()
@@ -10,8 +11,11 @@ export default function HomePage() {
     // mismatch); the real values are restored from localStorage on mount below.
     const [room, setRoom] = useState('')
     const [identity, setIdentity] = useState('')
+    const [language, setLanguage] = useState<Lang>('en')
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
+
+    const t = STRINGS[language]
 
     // Use a FRESH, unique room for every visit so the LiveKit agent is reliably
     // dispatched on room creation (rejoining a lingering room does not re-dispatch).
@@ -21,22 +25,24 @@ export default function HomePage() {
     useEffect(() => {
         setRoom('support-' + Math.random().toString(36).slice(2, 8))
         setIdentity(localStorage.getItem('dialo_identity') ?? '')
+        const savedLang = localStorage.getItem('dialo_language')
+        if (savedLang === 'ar' || savedLang === 'en') setLanguage(savedLang)
     }, [])
 
     async function handleJoin(e: React.FormEvent) {
         e.preventDefault()
-        if (!identity.trim()) { setError('Please enter your name.'); return }
+        if (!identity.trim()) { setError(t.nameRequired); return }
         setLoading(true)
         setError('')
         try {
             const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/token`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ room, identity }),
+                body: JSON.stringify({ room, identity, language }),
             })
             if (!res.ok) throw new Error('Failed to get token')
             const data = await res.json()
-            router.push(`/room?token=${encodeURIComponent(data.token)}&room=${encodeURIComponent(room)}&identity=${encodeURIComponent(identity)}`)
+            router.push(`/room?token=${encodeURIComponent(data.token)}&room=${encodeURIComponent(room)}&identity=${encodeURIComponent(identity)}&language=${encodeURIComponent(language)}`)
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : 'Connection failed')
         } finally {
@@ -45,7 +51,7 @@ export default function HomePage() {
     }
 
     return (
-        <main className={styles.main}>
+        <main className={styles.main} dir={isRTL(language) ? 'rtl' : 'ltr'}>
             {/* Background orbs */}
             <div className={styles.orb1} aria-hidden />
             <div className={styles.orb2} aria-hidden />
@@ -59,12 +65,12 @@ export default function HomePage() {
 
                 {/* Headline */}
                 <h1 className={styles.headline}>
-                    Talk to{' '}
+                    {t.headlinePre}{' '}
                     <span className="gradient-text">Dialo</span>
-                    <br />Customer Support
+                    <br />{t.headlinePost}
                 </h1>
                 <p className={styles.sub}>
-                    Real-time voice assistant
+                    {t.sub}
                     <br />
                 </p>
 
@@ -72,18 +78,35 @@ export default function HomePage() {
                 <div className={`card ${styles.joinCard}`}>
                     <form onSubmit={handleJoin}>
                         <div className={styles.field}>
-                            <label htmlFor="identity" className={styles.label}>Your Name</label>
+                            <label htmlFor="identity" className={styles.label}>{t.nameLabel}</label>
                             <input
                                 id="identity"
                                 className="input"
                                 value={identity}
                                 onChange={e => { setIdentity(e.target.value); localStorage.setItem('dialo_identity', e.target.value) }}
-                                placeholder="e.g. Alex"
+                                placeholder={t.namePlaceholder}
                                 autoFocus
                             />
                         </div>
                         <div className={styles.field}>
-                            <label htmlFor="room" className={styles.label}>Room ID</label>
+                            <label htmlFor="language" className={styles.label}>{t.languageLabel}</label>
+                            <select
+                                id="language"
+                                className="input"
+                                value={language}
+                                onChange={e => {
+                                    const lang = e.target.value as Lang
+                                    setLanguage(lang)
+                                    localStorage.setItem('dialo_language', lang)
+                                }}
+                            >
+                                {LANGUAGES.map(l => (
+                                    <option key={l.code} value={l.code}>{l.label}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className={styles.field}>
+                            <label htmlFor="room" className={styles.label}>{t.roomLabel}</label>
                             <input
                                 id="room"
                                 className="input"
@@ -99,7 +122,7 @@ export default function HomePage() {
                             className={`btn btn-primary ${styles.joinBtn} ${loading ? styles.loading : ''}`}
                             disabled={loading}
                         >
-                            {loading ? 'Connecting…' : '🎙️ Start Voice Session'}
+                            {loading ? t.connecting : t.startSession}
                         </button>
                     </form>
                 </div>

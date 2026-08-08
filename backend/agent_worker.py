@@ -21,6 +21,8 @@ Reads LIVEKIT_URL / LIVEKIT_API_KEY / LIVEKIT_API_SECRET from the environment.
 Verified against livekit-agents==1.6.7.
 """
 
+import json
+
 from livekit.agents import (
     Agent,
     AgentServer,
@@ -34,18 +36,27 @@ from livekit.agents import (
 from livekit.plugins import silero, groq
 
 from livekit_agent.piper_tts_plugin import PiperTTS
+from livekit_agent.azure_tts_plugin import AzureTTS
+from livekit_agent.gemini_tts_plugin import GeminiTTS
 from agent.graph import run_agent
+from core.config import settings
 
-GREETING = "Hi! I'm Dialo, your customer service assistant. How can I help you today?"
+# Spoken opening line per language. English is Piper; Arabic is the Azure Egyptian
+# voice (Piper has no Egyptian voice), so the Arabic greeting is Egyptian dialect.
+GREETINGS = {
+    "en": "Hi! I'm Dialo, your customer service assistant. How can I help you today?",
+    "ar": "أهلاً! أنا Dialo، مساعد خدمة العملاء. أقدر أساعدك بإيه النهاردة؟",
+}
 
 
 class CustomerServiceAgent(Agent):
     """Delegates the LLM step to the existing LangGraph RAG agent via llm_node."""
 
-    def __init__(self, session_id: str) -> None:
+    def __init__(self, session_id: str, language: str = "en") -> None:
         # instructions are unused: run_agent applies its own RAG system prompt.
         super().__init__(instructions="You are a helpful customer service assistant.")
         self._session_id = session_id
+        self._language = language
 
     async def llm_node(self, chat_ctx, tools, model_settings: ModelSettings):
         # Most recent user turn from the accumulated chat context.
@@ -55,7 +66,9 @@ class CustomerServiceAgent(Agent):
                 query = item.text_content or ""
                 break
 
-        result = await run_agent(query=query, session_id=self._session_id)
+        result = await run_agent(
+            query=query, session_id=self._session_id, language=self._language
+        )
         # Yielding a plain string routes through transcription_node -> tts_node.
         yield result["answer"]
 
@@ -90,9 +103,34 @@ async def entrypoint(ctx: JobContext):
     participant = await ctx.wait_for_participant()
     session_id = participant.identity or ctx.room.name
 
+    # Language is a client-supplied choice set on the token (see api/token.py):
+    # participant attributes, with a metadata fallback. "ar" → Egyptian Arabic
+    # pipeline; anything else → English.
+    language = (participant.attributes or {}).get("language")
+    if not language and participant.metadata:
+        try:
+            language = json.loads(participant.metadata).get("language")
+        except (ValueError, TypeError):
+            language = None
+    if language != "ar":
+        language = "en"
+
+    # English always uses offline Piper. Arabic needs a non-Piper voice (Piper has no
+    # Egyptian voice) — pick the engine from config: Gemini (default, reuses the Gemini
+    # key) or Azure (dedicated ar-EG neural voice).
+    if language == "ar":
+        tts = (
+            AzureTTS(voice=settings.azure_tts_voice_ar)
+            if settings.arabic_tts_provider == "azure"
+            else GeminiTTS(voice=settings.gemini_tts_voice)
+        )
+    else:
+        tts = PiperTTS()
+
     session = AgentSession(
         vad=ctx.proc.userdata["vad"],
-        stt=groq.STT(model="whisper-large-v3-turbo"),  # reads GROQ_API_KEY from env
+        # Force the Whisper language so Egyptian speech isn't mis-detected as English.
+        stt=groq.STT(model="whisper-large-v3-turbo", language=language),
         # An llm MUST be set: the session only runs its reply pipeline (the task that
         # invokes Agent.llm_node) when `self.llm` is an llm.LLM instance — see
         # agent_activity.py `if self.llm is None: raise ... elif isinstance(self.llm,
@@ -101,7 +139,7 @@ async def entrypoint(ctx: JobContext):
         # generation (routing to the LangGraph RAG agent), so this Groq LLM is only a
         # lightweight placeholder to enable the pipeline — it is never actually called.
         llm=groq.LLM(model="llama-3.1-8b-instant"),
-        tts=PiperTTS(),
+        tts=tts,
         # groq.STT is non-streaming, so LiveKit wraps it in a StreamAdapter that only
         # calls Groq AFTER VAD end-of-speech. turn_detection="stt" commits the turn
         # when the STT FINAL transcript arrives (not on a VAD timer that fires before
@@ -112,14 +150,14 @@ async def entrypoint(ctx: JobContext):
     )
 
     await session.start(
-        agent=CustomerServiceAgent(session_id=session_id),
+        agent=CustomerServiceAgent(session_id=session_id, language=language),
         room=ctx.room,
         room_input_options=RoomInputOptions(),
         room_output_options=RoomOutputOptions(transcription_enabled=True),
     )
 
     # Deterministic opening line (bypasses run_agent so it isn't an empty query).
-    await session.say(GREETING)
+    await session.say(GREETINGS[language])
 
 
 if __name__ == "__main__":

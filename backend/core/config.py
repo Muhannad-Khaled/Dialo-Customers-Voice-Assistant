@@ -10,6 +10,27 @@ class Settings(BaseSettings):
     # Groq (Whisper STT — free API)
     groq_api_key: str = ""
 
+    # Arabic TTS engine. English always uses Piper (offline); Arabic needs a
+    # non-Piper voice (Piper has no Egyptian voice). Choose the engine here:
+    #   "gemini" — reuses GEMINI_API_KEY, no new secret (default)
+    #   "azure"  — dedicated ar-EG neural voice (needs azure_speech_* below)
+    arabic_tts_provider: str = "gemini"
+
+    # Gemini TTS (default Arabic engine) — reuses gemini_api_key. Note: the preview
+    # TTS model may 404 on keys where gemini-2.5-* chat models are unavailable; if so
+    # set arabic_tts_provider="azure".
+    gemini_tts_model: str = "gemini-2.5-flash-preview-tts"
+    gemini_tts_voice: str = "Kore"
+
+    # Azure Speech (fallback Arabic engine) — billed per character, Arabic turns only
+    # (free tier 0.5M chars/month). Only needed when arabic_tts_provider="azure".
+    azure_speech_key: str = ""
+    azure_speech_region: str = ""  # e.g. "eastus"
+    azure_tts_voice_ar: str = "ar-EG-SalmaNeural"  # true Egyptian voice
+
+    # Default language when a call carries no explicit choice ("en" | "ar").
+    default_language: str = "en"
+
     # LiveKit
     livekit_url: str = "ws://localhost:7880"
     livekit_api_key: str = "devkey"
